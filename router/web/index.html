@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <title>AI Router</title>
+    <link rel="stylesheet" href="/styles.css" />
+    <script src="/app.js" defer></script>
+  </head>
+  <body>
+    <a href="#content" class="skip-link">Zum Inhalt</a>
+    <div class="shell">
+      <aside class="sidebar">
+        <a class="brand" href="/" aria-label="AI Router Startseite"
+          ><img src="/icons/route.svg" alt="" />AI Router</a
+        >
+        <div class="workspace-label">Dein Arbeitsbereich</div>
+        <nav aria-label="Hauptnavigation">
+          <a href="/" data-nav="overview"
+            ><img src="/icons/layout-dashboard.svg" alt="" />Übersicht</a
+          >
+          <a href="/tasks" data-nav="tasks"
+            ><img src="/icons/layers.svg" alt="" />Aufgaben<span
+              id="task-count"
+            ></span
+          ></a>
+          <a href="/agents" data-nav="agents"
+            ><img src="/icons/terminal.svg" alt="" />Agenten</a
+          >
+          <a href="/settings" data-nav="settings"
+            ><img src="/icons/settings-2.svg" alt="" />Einstellungen</a
+          >
+        </nav>
+        <div class="sidebar-bottom">
+          <div class="local-status">
+            <span class="status-dot"></span>Lokal auf deinem Rechner
+          </div>
+          <p>Du entscheidest, was gestartet<br />und was übernommen wird</p>
+          <button class="text-button" id="help-button">
+            Wie funktioniert das?
+          </button>
+        </div>
+      </aside>
+      <main id="content" tabindex="-1">
+        <header class="topbar">
+          <span
+            >Arbeitsbereich <span class="slash">/</span>
+            <span id="breadcrumb">Übersicht</span></span
+          ><span class="connection" id="connection"
+            >Verbindung wird geprüft</span
+          >
+        </header>
+        <div class="page" id="page">
+          <p class="muted">Arbeitsbereich wird geladen …</p>
+        </div>
+      </main>
+    </div>
+    <div id="toast" class="toast" role="status" hidden></div>
+    <dialog id="help-dialog">
+      <div class="dialog-content">
+        <span class="eyebrow">In drei Schritten</span>
+        <h2>Vom Auftrag zum Ergebnis</h2>
+        <ol class="help-steps">
+          <li>
+            <strong>Aufgabe beschreiben</strong>
+            <p>Wähle dein Projekt und beschreibe, was sich ändern soll</p>
+          </li>
+          <li>
+            <strong>Agent arbeiten lassen</strong>
+            <p>
+              Der Agent arbeitet in einer eigenen Kopie. Freebuff öffnest du
+              dafür im Terminal
+            </p>
+          </li>
+          <li>
+            <strong>Ergebnis prüfen</strong>
+            <p>
+              Sieh dir Änderungen und Tests an. Dein Hauptbranch wird nie
+              automatisch geändert
+            </p>
+          </li>
+        </ol>
+        <button class="primary" id="close-help">Verstanden</button>
+      </div>
+    </dialog>
+  </body>
+</html>

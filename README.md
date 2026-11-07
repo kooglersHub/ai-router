@@ -1,49 +1,115 @@
-# AI Router – lokaler Cezar-Test
+# AI Router
 
-Dieser Ordner nutzt Cezar statt eines neu entwickelten Python-Routers. Installiert ist die veroeffentlichte Version **0.18.0**, lokal unter `.local/cezar`. Es gibt keine globale Installation.
+Ein lokales Webinterface für Entwicklungsaufgaben: Auftrag beschreiben, Agent auswählen, getrennt vom Hauptprojekt arbeiten und das Ergebnis prüfen. Die Oberfläche ist deutsch und verwendet helle Flächen, Systemschrift und eine klare Schrittfolge nach Apple-Vorbild.
 
-## Start unter Windows
+## Starten
+
+Voraussetzungen: **Python 3.12+** und **Git** im Suchpfad. Der Router selbst benötigt keine Python-Pakete und keinen Frontend-Build.
 
 ```powershell
 cd 'C:\Users\karl\Documents\ChatGPT\ai router'
-.\start-cezar-demo.ps1
+.\start-router.ps1
 ```
 
-Die Oberflaeche ist standardmaessig unter http://127.0.0.1:4321 erreichbar. Bei belegtem Port kann Cezar einen anderen Port verwenden; die Serverausgabe nennt ihn. Mit `-NoOpen` startet der Server ohne Browser. Strg+C beendet einen im Terminal gestarteten Server.
-
-Der Start setzt immer `CEZ_DRY_RUN=1`: Die Agenten werden simuliert. Aufgaben bearbeiten nur das lokale Test-Repository `.local/demo`. Die Demo nutzt ein eigenes `CEZ_HOME` unter `.local/cezar-home`, maximal eine aktive Aufgabe und keine automatisch importierten Team-Skills. Der Launcher bietet absichtlich keinen Echtbetrieb-Schalter.
-
-## Installation wiederherstellen
-
-Node.js 20+ und pnpm benoetigt. Die lokale Installation und deren Lockfile liegen unter `.local/cezar`:
+Öffne [den lokalen Arbeitsbereich](http://127.0.0.1:4321). Das Startskript öffnet den Browser und startet den Server im Hintergrund. Eine bereits laufende Router-Instanz wird wiederverwendet.
 
 ```powershell
-pnpm --dir .local/cezar add --save-exact cezar-run@0.18.0
+.\start-router.ps1 -NoOpen
+.\stop-router.ps1
 ```
 
-Auf diesem Rechner wurde das mit Codex gebuendelte pnpm ueber Node gestartet, da npm/npx nicht im Suchpfad liegen. Das Demo-Repository und die isolierte Konfiguration sind lokale Testdaten; sie werden nicht versioniert.
+Alternativ im Terminal, mit sichtbarer Serverausgabe und Strg+C zum Beenden:
 
-## Was der Test belegt
+```powershell
+python -m router.server --port 4321
+```
 
-Die Demo prueft Installation, Weboberflaeche und einen simulierten Aufgabenlauf. Sie belegt keine echte Agenten-Authentifizierung, automatische Kontingenterkennung, Budgetgrenzen oder Codequalitaet. Angezeigte Token und Kosten im Dry-Run sind simulierte Werte.
+Nach einem Rechnerneustart das Startskript erneut ausführen. Es wird kein Autostart eingerichtet. Logs liegen unter `.local/router/stdout.log` und `stderr.log`.
 
-Es werden keine echten Agentenauftraege gestartet, keine Pull Requests veroeffentlicht und keine Merges oder Deployments ausgefuehrt. Ein echter Test am Kleinanzeigen-Projekt ist ein separater naechster Schritt.
+## Der erste Auftrag
 
-### Ergebnis vom 7. November 2026
+1. Auf **Übersicht** beschreiben, was erledigt werden soll. Ein Titel ist optional.
+2. Projektordner und Agent wählen. Das mitgelieferte `router-demo` ist ein separates Testprojekt.
+3. Mit **Erst ausprobieren** den Ablauf ohne Agentenaufruf testen. Dabei werden weder Dateien geändert noch Tests ausgeführt.
+4. Für eine echte Umsetzung **Echte Aufgabe** wählen und den konkreten Aufruf freigeben.
+5. **Ergebnis prüfen** zeigt Änderungen. **Tests ausführen** startet ausschließlich deine konfigurierten Kommandos.
+6. **Prüfung bestätigen** schließt die Aufgabe ab. Es wird nichts gemergt, gepusht oder veröffentlicht.
 
-- Health-Endpunkt: HTTP 200, Version 0.18.0, Demo-Repository.
-- Server bindet ausschliesslich an `127.0.0.1:4321`.
-- Aufgabe in der Weboberflaeche angelegt und mit dem Claude-Mock ausgefuehrt.
-- Eigener Branch `cez/806599ce` und eigener Worktree erfolgreich angelegt.
-- Mock erzeugt `notes.md`; Demo-Hauptbranch bleibt sauber.
-- Sitzung beendet; Ergebnis wartet im Status `review` auf menschliche Pruefung.
-- Server-Fehlerlog nach dem Test leer; PowerShell-Launcher ohne Syntaxfehler.
+Jede echte Aufgabe bekommt eine eigene Git-Arbeitskopie und einen Branch. Grundlage ist der aktuelle HEAD-Commit; nicht eingecheckte Änderungen werden nicht kopiert. Der Pfad steht in den Aufgabendetails. **Es läuft höchstens eine aktive Aufgabe gleichzeitig.** Worktrees bleiben zur manuellen Prüfung erhalten. Sie sind Versionsisolation, keine Betriebssystem-Sandbox.
 
-Der Mock zeigt einen erfundenen GitHub-PR-Link und simulierte Kosten. Das Demo-Repository hat keinen Remote; es wurde kein PR erstellt. Die veroeffentlichte Version bietet in der getesteten Runner-Auswahl Claude, Codex, Junie, OpenCode, Cursor, Pi und Copilot. Gemini, Antigravity und Jules sind in dieser Version dort nicht verfuegbar; die neuere GitHub-Dokumentation darf nicht mit der installierten Version gleichgesetzt werden.
+## Freebuff
 
-Die laufende Hintergrundinstanz protokolliert unter `.local/cezar.stdout.log` und `.local/cezar.stderr.log`. Ihr PowerShell-Launcher ist in `.local/cezar-server.pid` vermerkt. Das Webinterface bleibt waehrend dieses lokalen Tests erreichbar; nach einem Rechnerneustart den Launcher erneut ausfuehren.
+Die vom Nutzer gewünschte [Freebuff CLI](https://freebuff.com/cli) ist als interaktiver Agent angebunden. Installiert und mit `--help` geprüft wurde **0.2.36**. Diese Version unterstützt `--cwd`, aber keinen Prompt-/Headless-Modus.
 
-## Quellen
+1. In der Aufgabe **Freebuff** und **Echte Aufgabe** auswählen.
+2. **Freebuff vorbereiten** legt die isolierte Arbeitskopie an; es sendet noch keinen Auftrag.
+3. **Auftrag kopieren**, dann **Freebuff öffnen** anklicken.
+4. Im Terminal bei Bedarf anmelden, den Auftrag einfügen und bearbeiten lassen.
+5. Freebuff beenden und das Terminal schließen; anschließend im Router **Ergebnis prüfen** wählen.
 
-- https://github.com/open-mercato/cezar
-- https://github.com/open-mercato/cezar#quick-start
+Der Windows-Terminalstart wird vom Router ausgeführt. Laufende Sitzungen werden über PID und Prozesserstellungszeit erkannt, auch nach einem Router-Neustart. Solange Freebuff läuft, bleiben Testausführung und weitere aktive Aufträge gesperrt. Die interaktive Sitzung hat kein automatisch erzwungenes Agentenzeitlimit. Der Router führt weder Login noch einen KI-Auftrag beim Start automatisch aus.
+
+Lokale Installation wiederherstellen:
+
+```powershell
+.\install-agents.ps1
+```
+
+Dafür werden Node.js 20+ sowie npm oder pnpm benötigt; auf diesem Rechner kann das Skript auch das mit Codex gebündelte pnpm nutzen. Die Installation liegt unter `.local/agents`, ohne globale Installation.
+
+## Weitere Agenten
+
+- **Codex:** vorhandene native `codex`-CLI im Suchpfad; `codex exec --sandbox workspace-write` setzt Aufgaben um. Agenten-Schutzmechanismen werden nicht deaktiviert.
+- **Gemini:** Adapter für `gemini -p` vorhanden; derzeit auf diesem Rechner noch nicht installiert. Mit `install-agents.ps1 -WithGemini` lokal installieren und im Terminal anmelden. Berechtigungen und Abrechnung richten sich nach der Gemini-Konfiguration.
+- **Antigravity und Jules:** keine aktive Integration in dieser Version. Sie werden nicht als einsatzbereit ausgegeben.
+
+Die Agentenübersicht unterscheidet Installation von Anmeldung. Eine echte Authentifizierung oder erfolgreiche Modellanfrage wurde bei der Implementierung nicht getestet. Kostenpflichtige Modellaufrufe wurden nicht ausgeführt.
+
+## Tests und Kontingente konfigurieren
+
+Unter **Einstellungen** lassen sich der Standardordner, manuell verbleibende Aufgaben pro Agent und Kostenschätzungen angeben. Bei `0` Aufgaben wird der Agent nicht ausgewählt. Leere Felder bedeuten unbekannt. Automatische CLI-Versuche reduzieren den manuellen Zähler; Freebuff-Zähler werden von dir gepflegt.
+
+Die Auswahl bevorzugt Gemini bei Analyse/kleinen Aufgaben und Codex bei mittleren/großen Umsetzungen, berücksichtigt Installation, manuelle Kontingente und bei gesetztem Budget die Kostenschätzung. Sie ist eine feste Heuristik, kein lernendes System. Ist kein geeigneter automatischer Agent vorhanden, kann Freebuff als interaktiver Übergang vorbereitet werden.
+
+Ein Budget ist eine **Vorprüfung anhand deiner Schätzung**, kein hartes Provider-Ausgabenlimit. Tatsächliche Kosten werden nicht erfunden: ohne Rückmeldung des Dienstes bleiben sie unbekannt. Es gibt keinen automatischen Wechsel auf einen kostenpflichtigen Dienst. Nach Fehlern kannst du vorhandene Änderungen prüfen und einen weiteren Auftrag mit einem anderen Agenten starten.
+
+Testkommandos werden als JSON-Argumentlisten gespeichert, zum Beispiel:
+
+```json
+[["python", "-m", "unittest", "discover", "-s", "tests"]]
+```
+
+Die Befehle laufen nach ausdrücklichem Klick lokal in der Arbeitskopie. Änderungen an der Testkonfiguration lassen sich auch auf bestehende Aufgaben anwenden. CLI-Ausgaben und Testprotokolle sind auf die letzten 100 KB je Prozess begrenzt, Diffs auf eine begrenzte Vorschau. Eine erfolgreiche Agenten-Ausführung gilt nicht automatisch als bestandener Test. Eine nicht bestandene Prüfung bleibt sichtbar.
+
+## Entwicklung und Prüfung
+
+```powershell
+python -m unittest discover -s tests -v
+python -m pip install ruff==0.14.3
+ruff check router tests
+ruff format --check router tests
+node --check router/web/app.js
+```
+
+Die Tests verwenden temporäre Git-Repositories und lokale Python-Testprozesse; sie rufen keine echten Coding-Dienste auf. Sie prüfen Freigaben, Routing/Budgetfilter, SQLite-Neustartverhalten, Single-Task-Sperren, Worktree-Isolation, Terminal-Wiedererkennung, Timeouts, nachträgliche Testkonfiguration sowie HTTP-Origin-/Host-Schutz. GitHub Actions ist für Windows mit Python 3.12 und 3.14 vorbereitet; lokal geprüft wurde Python 3.14.6.
+
+Python wird mit Ruff formatiert. HTML/CSS/JavaScript werden mit Prettier 3.5.3 formatiert (lokal unter `.local/agents/node_modules/prettier`). Der Server bindet nur an `127.0.0.1`. Schreibzugriffe brauchen ein lokales Sitzungstoken und werden bei fremder Origin oder fremdem Host abgewiesen. Dieser persönliche lokale Server ist nicht für öffentliche Bereitstellung ausgelegt.
+
+## Aufbau
+
+- `router/server.py`: lokaler HTTP-Server und statische Oberfläche
+- `router/service.py`: Aufgaben, Worktrees und Ergebnisprüfung
+- `router/store.py`: SQLite und Instanzsperre
+- `router/agents.py`: Agentenerkennung, Routing und Prozessausführung
+- `router/web/`: Oberfläche ohne Build-Schritt
+- `.local/router/`: lokale Aufgaben, Datenbank, Logs und Arbeitskopien (nicht versioniert)
+
+Die frühere Cezar-Demo bleibt unverändert erhalten. Sie wird nicht als Backend der neuen Oberfläche verwendet; der aktuelle Router ruft die lokalen CLIs direkt auf. Die alte Demo kann separat mit `start-cezar-demo.ps1 -Port 4323` gestartet werden. Historische Prüfergebnisse stehen unter `docs/cezar-demo.md`.
+
+## Gestaltung und Quellen
+
+Unslop von **Damir Sokolovsky ([@heydamir](https://x.com/heydamir))**, CC BY 4.0, wurde als Gestaltungsanleitung verwendet. Lucide-Icons: ISC-Lizenz unter `router/web/icons/LICENSE`. Die Gestaltung ist Apple-inspiriert; es werden keine Apple-Markenassets verwendet.
+
+- [Freebuff-CLI-Quellcode und Argumente](https://github.com/CodebuffAI/freebuff/blob/main/cli/src/cli-args.ts)
+- [Gemini Headless-Dokumentation](https://geminicli.com/docs/cli/headless/)
+- [Cezar](https://github.com/open-mercato/cezar)
