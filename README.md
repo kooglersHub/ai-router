@@ -59,6 +59,16 @@ Dafür werden Node.js 20+ sowie npm oder pnpm benötigt; auf diesem Rechner kann
 
 ## Weitere Agenten
 
+### KIT KI-Toolbox
+
+Beende eine laufende Router-Instanz und starte sie mit `.\start-router.ps1 -Kit`. PowerShell fragt den API-Key verdeckt ab. Der Key gilt für diese Server-Sitzung und wird weder in SQLite noch im Git-Repository gespeichert. Alternativ liest der Server `KIT_TOOLBOX_API_KEY` beim Start aus der Umgebung.
+
+Trage unter **Einstellungen → KIT-Tokenbudget** das Gesamtkontingent ein, das dieser Router verwenden darf. Standardmäßig beträgt es 0. Das Antwortlimit beginnt bei 512 Tokens. Der Router reserviert vor dem Aufruf eine konservative Schätzung für Eingabe, Chat-Overhead und Antwort. Falls KIT einen Verbrauch meldet, ersetzt dieser die Schätzung. Bei fehlender Verbrauchsmeldung oder einem Fehler bleibt die Reservierung erhalten. Andere Clients und serverseitige Prompt-Zusätze kann der lokale Zähler nicht vorab erfassen.
+
+Wähle **KIT KI-Toolbox · Umsetzungsplan** für einen freigegebenen Auftrag. Der Router sendet Titel, Beschreibung und Erfolgskriterien einmal an das KIT-Modell `alias.simple-local`. Der Plan erscheint im Ergebnis und lässt sich für einen separaten Umsetzungsauftrag verwenden. Zugriff und Modell-ID sind in der [KIT-Dokumentation](https://www.scc.kit.edu/dienste/ki-toolbox.php) beschrieben. Bei Verbindungsproblemen prüfe KIT-Netz oder VPN.
+
+### Lokale CLIs
+
 - **Codex:** vorhandene native `codex`-CLI im Suchpfad; `codex exec --sandbox workspace-write` setzt Aufgaben um. Agenten-Schutzmechanismen werden nicht deaktiviert.
 - **Gemini:** Adapter für `gemini -p` vorhanden; derzeit auf diesem Rechner noch nicht installiert. Mit `install-agents.ps1 -WithGemini` lokal installieren und im Terminal anmelden. Berechtigungen und Abrechnung richten sich nach der Gemini-Konfiguration.
 - **Antigravity und Jules:** keine aktive Integration in dieser Version. Sie werden nicht als einsatzbereit ausgegeben.

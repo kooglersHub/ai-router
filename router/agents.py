@@ -98,8 +98,9 @@ def run_command(command, cwd, timeout=600, cancel=None):
 
 
 class AgentRegistry:
-    def __init__(self, root):
+    def __init__(self, root, kit_configured=False):
         self.root = Path(root)
+        self.kit_configured = kit_configured
 
     def command(self, agent):
         if agent == "codex":
@@ -147,7 +148,7 @@ class AgentRegistry:
                 "Analyse und Umsetzung über eine lokale Gemini-Installation",
             ),
         ]
-        return [
+        agents = [
             dict(
                 id=key,
                 name=name,
@@ -160,6 +161,16 @@ class AgentRegistry:
             )
             for key, name, kind, description in descriptions
         ]
+        agents.append(
+            dict(
+                id="kit",
+                name="KIT KI-Toolbox",
+                kind="planner",
+                description="Kurze Analyse und Umsetzungsplan aus deinem Auftrag",
+                installed=self.kit_configured,
+            )
+        )
+        return agents
 
     def choose(self, requested, task_type, difficulty, quotas):
         if requested != "auto":

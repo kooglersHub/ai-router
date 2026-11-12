@@ -7,6 +7,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from router.agents import AgentRegistry, run_command
+from router.kit import KitClient
 from router.service import Router
 
 
@@ -75,6 +76,53 @@ class RouterTests(unittest.TestCase):
     def test_live_requires_explicit_consent(self):
         with self.assertRaisesRegex(ValueError, "Freigabe"):
             self.router.create(self.payload(mode="live", agent="codex"))
+
+    def test_kit_blocks_live_request_before_spending_and_allows_demo(self):
+        self.router.kit = KitClient("fixture-key")
+        with patch.object(self.router.kit, "complete") as complete:
+            with self.assertRaisesRegex(ValueError, "Tokenbudget"):
+                self.router.create(self.payload(agent="kit", mode="live", consent=True))
+            task = self.router.create(self.payload(agent="kit"))
+            self.assertEqual(self.wait(task["id"])["status"], "demo_complete")
+            complete.assert_not_called()
+
+    def test_kit_plan_uses_only_task_text_and_records_reported_tokens(self):
+        self.router.kit = KitClient("fixture-key")
+        self.router.save_settings({"kit_budget": 2000, "kit_output_limit": 128})
+        with patch.object(
+            self.router.kit, "complete", return_value=("Plan", 75, False)
+        ) as complete:
+            task = self.router.create(
+                self.payload(agent="kit", mode="live", consent=True)
+            )
+            result = self.wait(task["id"])
+            complete.assert_called_once()
+            messages, limit, _ = complete.call_args.args
+            self.assertEqual(limit, 128)
+            self.assertNotIn(str(self.repo), str(messages))
+            self.assertIn("Filter korrigieren", str(messages))
+        self.assertEqual(result["status"], "done")
+        self.assertEqual(result["output"], "Plan")
+        self.assertIsNone(result["worktree"])
+        self.assertEqual(result["kit_tokens_actual"], 75)
+        self.assertEqual(self.router.settings()["kit_used"], 75)
+
+    def test_failed_kit_request_keeps_reservation_and_is_not_retried(self):
+        self.router.kit = KitClient("fixture-key")
+        self.router.save_settings({"kit_budget": 2000})
+        with patch.object(
+            self.router.kit, "complete", side_effect=RuntimeError("HTTP 429")
+        ) as complete:
+            task = self.router.create(
+                self.payload(agent="kit", mode="live", consent=True)
+            )
+            result = self.wait(task["id"])
+            complete.assert_called_once()
+        self.assertEqual(result["status"], "failed")
+        self.assertGreater(result["kit_tokens_reserved"], 0)
+        self.assertEqual(
+            self.router.settings()["kit_used"], result["kit_tokens_reserved"]
+        )
 
     def test_freebuff_creates_isolated_worktree_and_waits_for_user(self):
         task = self.router.create(

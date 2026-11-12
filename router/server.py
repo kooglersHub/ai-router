@@ -4,12 +4,14 @@ import argparse
 import json
 import logging
 import mimetypes
+import os
 import secrets
 import subprocess
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import unquote, urlsplit
 
+from .kit import KEY_ENV, KitClient
 from .service import Router
 
 
@@ -184,7 +186,8 @@ def main():
         level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s"
     )
     root = Path(__file__).resolve().parents[1]
-    with_router = Router(root / ".local/router", ensure_demo(root), root)
+    kit = KitClient(os.environ.pop(KEY_ENV, ""))
+    with_router = Router(root / ".local/router", ensure_demo(root), root, kit=kit)
     server = None
     try:
         server = make_server(with_router, args.port)

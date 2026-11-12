@@ -12,6 +12,7 @@ import uuid
 from pathlib import Path
 
 from .agents import AgentRegistry, process_identity, run_command
+from .kit import DEFAULT_OUTPUT_LIMIT, KitClient, messages_for, reserve_tokens
 from .store import ACTIVE, Store
 
 
@@ -40,10 +41,13 @@ def repository_path(value):
 
 
 class Router:
-    def __init__(self, directory, default_repo, root=None):
+    def __init__(self, directory, default_repo, root=None, kit=None):
         self.directory = Path(directory).resolve()
         self.store = Store(self.directory)
-        self.registry = AgentRegistry(root or Path(__file__).resolve().parents[1])
+        self.kit = kit if kit is not None else KitClient()
+        self.registry = AgentRegistry(
+            root or Path(__file__).resolve().parents[1], self.kit.configured
+        )
         self.default_repo = str(default_repo)
         self.mutex = threading.RLock()
         self.pool = concurrent.futures.ThreadPoolExecutor(max_workers=1)
@@ -78,14 +82,32 @@ class Router:
                 quotas={"codex": None, "gemini": None, "freebuff": None},
                 tests=[],
                 estimated_costs={"codex": None, "gemini": None, "freebuff": None},
+                kit_budget=0,
+                kit_used=0,
+                kit_output_limit=DEFAULT_OUTPUT_LIMIT,
             )
             | self.store.settings()
         )
 
     def save_settings(self, value):
+        with self.mutex:
+            return self._save_settings(value)
+
+    def _save_settings(self, value):
         if not isinstance(value, dict):
             raise ValueError("Einstellungen müssen ein Objekt sein.")
         settings = self.settings()
+        for field, minimum, maximum in (
+            ("kit_budget", 0, 2**53 - 1),
+            ("kit_output_limit", 1, 4096),
+        ):
+            if field in value:
+                number = value[field]
+                if type(number) is not int or not minimum <= number <= maximum:
+                    raise ValueError(
+                        f"KIT-Tokenlimit muss eine ganze Zahl zwischen {minimum} und {maximum} sein."
+                    )
+                settings[field] = number
         if "repo" in value:
             settings["repo"] = str(repository_path(value["repo"]))
         for key in ("quotas", "estimated_costs"):
@@ -184,9 +206,13 @@ class Router:
             or len(task.get("criteria", "")) > 10000
         ):
             raise ValueError("Akzeptanzkriterien sind zu lang oder ungültig.")
-        if task.get("agent") not in ("auto", "codex", "gemini", "freebuff") or task.get(
-            "mode"
-        ) not in ("demo", "live"):
+        if task.get("agent") not in (
+            "auto",
+            "codex",
+            "gemini",
+            "freebuff",
+            "kit",
+        ) or task.get("mode") not in ("demo", "live"):
             raise ValueError("Ungültiger Agent oder Modus.")
         if task.get("task_type") not in (
             "bugfix",
@@ -216,7 +242,7 @@ class Router:
         selected = self.registry.choose(
             task["agent"], task["task_type"], task["difficulty"], eligible_quotas
         )
-        estimate = settings["estimated_costs"].get(selected)
+        estimate = 0 if selected == "kit" else settings["estimated_costs"].get(selected)
         if (
             task["mode"] == "live"
             and budget is not None
@@ -227,10 +253,20 @@ class Router:
             )
         if (
             task["mode"] == "live"
-            and selected != "freebuff"
+            and selected not in ("freebuff", "kit")
             and not self.registry.command(selected)
         ):
             raise ValueError(f"{selected} ist nicht installiert.")
+        if selected == "kit" and task["mode"] == "live":
+            if not self.kit.configured:
+                raise ValueError(
+                    "Hinterlege zuerst deinen KIT-API-Key beim Start des Routers."
+                )
+            task.setdefault("criteria", "")
+            self.check_kit_budget(
+                settings,
+                reserve_tokens(messages_for(task), settings["kit_output_limit"]),
+            )
         return dict(
             id=uuid.uuid4().hex,
             title=task["title"].strip(),
@@ -251,6 +287,9 @@ class Router:
             duration=None,
             cost_actual=None,
             cost_estimate=estimate,
+            kit_output_limit=settings["kit_output_limit"]
+            if selected == "kit"
+            else None,
             worktree=None,
             branch=None,
             tests=settings["tests"],
@@ -261,12 +300,10 @@ class Router:
             events=[
                 dict(
                     time=now(),
-                    message=f"{selected} ausgewählt: zulässig und Kontingent verfügbar. "
-                    + (
-                        "Analyse und kleine Aufgaben bevorzugen Gemini."
-                        if task["task_type"] == "research"
-                        or task["difficulty"] == "easy"
-                        else "Mittlere und große Umsetzungen bevorzugen Codex."
+                    message=(
+                        "KIT KI-Toolbox für einen Umsetzungsplan ausgewählt."
+                        if selected == "kit"
+                        else f"{selected} ausgewählt: zulässig und Kontingent verfügbar."
                     ),
                 )
             ],
@@ -302,6 +339,11 @@ class Router:
                     duration=round(time.monotonic() - started, 2),
                     output="Der Ablauf ist bereit. Für echte Änderungen wähle „Echte Aufgabe“ und gib den Aufruf frei.",
                 )
+                return
+            if self.cancel.is_set():
+                raise InterruptedError("Ausführung abgebrochen")
+            if task["agent"] == "kit":
+                self.execute_kit(task)
                 return
             task = self.prepare_worktree(task)
             if self.cancel.is_set():
@@ -345,6 +387,51 @@ class Router:
             )
         finally:
             self.update(task_id, duration=round(time.monotonic() - started, 2))
+
+    @staticmethod
+    def check_kit_budget(settings, needed):
+        available = max(0, settings["kit_budget"] - settings["kit_used"])
+        if needed > available:
+            raise ValueError(
+                f"KIT-Tokenbudget zu klein: {available} verfügbar, {needed} geschätzt. Kürze den Auftrag oder passe das Budget an."
+            )
+
+    def execute_kit(self, task):
+        messages = messages_for(task)
+        reserved = reserve_tokens(messages, task["kit_output_limit"])
+        task_id = task["id"]
+        with self.mutex:
+            settings = self.settings()
+            self.check_kit_budget(settings, reserved)
+            # Persist before sending. A failed or interrupted response may still consume tokens.
+            settings["kit_used"] += reserved
+            self.store.save_settings(settings)
+            self.update(
+                task_id,
+                "KIT erstellt den Plan aus dem Auftragstext.",
+                kit_tokens_reserved=reserved,
+            )
+        output, total, truncated = self.kit.complete(
+            messages, task["kit_output_limit"], min(task["timeout"], 90)
+        )
+        if total is not None:
+            with self.mutex:
+                settings = self.settings()
+                settings["kit_used"] += total - reserved
+                self.store.save_settings(settings)
+        self.update(task_id, kit_tokens_actual=total, output=output)
+        if self.cancel.is_set():
+            raise InterruptedError(
+                "KIT-Aufruf beendet. Der Tokenverbrauch bleibt erfasst."
+            )
+        if not output.strip():
+            raise RuntimeError(
+                "KIT hat keinen Plan zurückgegeben. Prüfe das Antwortlimit."
+            )
+        message = "KIT-Plan bereit."
+        if truncated:
+            message = "KIT-Plan am Antwortlimit abgeschnitten."
+        self.update(task_id, message, status="done", finished_at=now())
 
     @staticmethod
     def prompt(task):
